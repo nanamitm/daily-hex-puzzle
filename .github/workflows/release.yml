@@ -1,0 +1,224 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  QT_VERSION: '6.9.2'
+  APP_NAME:   'DailyHexPuzzle'
+
+# ────────────────────────────────────────────────────────────────────────────
+jobs:
+
+  # ── Windows x64 ─────────────────────────────────────────────────────────
+  windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt + MinGW
+        uses: jurplel/install-qt-action@v4
+        with:
+          version:          ${{ env.QT_VERSION }}
+          host:             windows
+          target:           desktop
+          arch:             win64_mingw
+          tools:            tools_mingw1310_64
+          add-tools-to-path: true
+          cache:            true
+
+      - name: Generate app.ico
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass `
+            -File qt-client/gen_icon.ps1 -OutDir qt-client
+
+      - name: Configure
+        run: |
+          $mingw = "$env:IQTA_TOOLS\mingw1310_64\bin"
+          $env:PATH = "$mingw;$env:PATH"
+          cmake -S qt-client -B build -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" `
+            -DCMAKE_C_COMPILER="$mingw\gcc.exe" `
+            -DCMAKE_CXX_COMPILER="$mingw\g++.exe"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Deploy Qt runtime
+        run: |
+          $deploy = "deploy"
+          New-Item $deploy -ItemType Directory | Out-Null
+          Copy-Item build\${{ env.APP_NAME }}.exe $deploy\
+          Copy-Item build\libhex_solver.dll        $deploy\
+          windeployqt6 --release --no-translations --dir $deploy `
+            build\${{ env.APP_NAME }}.exe
+
+      - name: Package
+        run: |
+          $zip = "${{ env.APP_NAME }}-windows-x64.zip"
+          Compress-Archive deploy $zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: ${{ env.APP_NAME }}-windows-x64.zip
+
+  # ── Linux x86_64 AppImage ───────────────────────────────────────────────
+  linux-x64:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt (aqt)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host:    linux
+          target:  desktop
+          arch:    linux_gcc_64
+          cache:   true
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgl1-mesa-dev libglib2.0-dev \
+            libfuse2 patchelf \
+            python3-pil
+
+      - name: Generate icon PNG
+        run: python3 qt-client/gen_icon.py 256 ${{ env.APP_NAME }}.png
+
+      - name: Configure & build
+        run: |
+          cmake -S qt-client -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$QT_ROOT_DIR"
+          cmake --build build --parallel
+
+      - name: Download linuxdeploy
+        run: |
+          base="https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous"
+          bqt="https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous"
+          wget -q -O linuxdeploy            "$base/linuxdeploy-x86_64.AppImage"
+          wget -q -O linuxdeploy-plugin-qt  "$bqt/linuxdeploy-plugin-qt-x86_64.AppImage"
+          chmod +x linuxdeploy linuxdeploy-plugin-qt
+
+      - name: Create AppImage
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+          QMAKE: ${{ env.QT_ROOT_DIR }}/bin/qmake
+        run: |
+          cat > ${{ env.APP_NAME }}.desktop <<'EOF'
+          [Desktop Entry]
+          Name=${{ env.APP_NAME }}
+          Exec=${{ env.APP_NAME }}
+          Icon=${{ env.APP_NAME }}
+          Type=Application
+          Categories=Game;
+          EOF
+
+          ./linuxdeploy \
+            --appdir AppDir \
+            --executable build/${{ env.APP_NAME }} \
+            --library build/solver-ffi/libhex_solver.so \
+            --desktop-file ${{ env.APP_NAME }}.desktop \
+            --icon-file    ${{ env.APP_NAME }}.png \
+            --plugin qt \
+            --output appimage
+
+          mv ${{ env.APP_NAME }}-*.AppImage ${{ env.APP_NAME }}-linux-x64.AppImage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64
+          path: ${{ env.APP_NAME }}-linux-x64.AppImage
+
+  # ── Linux ARM64 AppImage ─────────────────────────────────────────────────
+  linux-arm64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            qt6-base-dev qt6-tools-dev cmake ninja-build \
+            libgl1-mesa-dev libglib2.0-dev \
+            libfuse2 patchelf \
+            python3-pil
+
+      - name: Generate icon PNG
+        run: python3 qt-client/gen_icon.py 256 ${{ env.APP_NAME }}.png
+
+      - name: Configure & build
+        run: |
+          QT_PREFIX=$(qmake6 -query QT_INSTALL_PREFIX)
+          cmake -S qt-client -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$QT_PREFIX"
+          cmake --build build --parallel
+
+      - name: Download linuxdeploy (aarch64)
+        run: |
+          base="https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous"
+          bqt="https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous"
+          wget -q -O linuxdeploy            "$base/linuxdeploy-aarch64.AppImage"
+          wget -q -O linuxdeploy-plugin-qt  "$bqt/linuxdeploy-plugin-qt-aarch64.AppImage"
+          chmod +x linuxdeploy linuxdeploy-plugin-qt
+
+      - name: Create AppImage
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+        run: |
+          export QMAKE=$(which qmake6)
+
+          cat > ${{ env.APP_NAME }}.desktop <<'EOF'
+          [Desktop Entry]
+          Name=${{ env.APP_NAME }}
+          Exec=${{ env.APP_NAME }}
+          Icon=${{ env.APP_NAME }}
+          Type=Application
+          Categories=Game;
+          EOF
+
+          ./linuxdeploy \
+            --appdir AppDir \
+            --executable build/${{ env.APP_NAME }} \
+            --library build/solver-ffi/libhex_solver.so \
+            --desktop-file ${{ env.APP_NAME }}.desktop \
+            --icon-file    ${{ env.APP_NAME }}.png \
+            --plugin qt \
+            --output appimage
+
+          mv ${{ env.APP_NAME }}-*.AppImage ${{ env.APP_NAME }}-linux-arm64.AppImage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64
+          path: ${{ env.APP_NAME }}-linux-arm64.AppImage
+
+  # ── GitHub Release ───────────────────────────────────────────────────────
+  release:
+    needs: [windows-x64, linux-x64, linux-arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            ${{ env.APP_NAME }}-windows-x64.zip
+            ${{ env.APP_NAME }}-linux-x64.AppImage
+            ${{ env.APP_NAME }}-linux-arm64.AppImage
