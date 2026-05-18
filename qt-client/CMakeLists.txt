@@ -49,6 +49,11 @@ target_link_libraries(DailyHexPuzzle PRIVATE
     hex_solver
 )
 
+# MSVC does not define M_PI by default
+if(MSVC)
+    target_compile_definitions(DailyHexPuzzle PRIVATE _USE_MATH_DEFINES)
+endif()
+
 # ── post-build: copy DLL next to the executable (Windows) ─────────────────
 if(WIN32)
     add_custom_command(TARGET DailyHexPuzzle POST_BUILD

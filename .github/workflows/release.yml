@@ -15,22 +15,20 @@ env:
 # ────────────────────────────────────────────────────────────────────────────
 jobs:
 
-  # ── Windows x64 ─────────────────────────────────────────────────────────
+  # ── Windows x64 (MSVC) ──────────────────────────────────────────────────
   windows-x64:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Qt + MinGW
+      - name: Install Qt (MSVC 2022)
         uses: jurplel/install-qt-action@v4
         with:
-          version:          ${{ env.QT_VERSION }}
-          host:             windows
-          target:           desktop
-          arch:             win64_mingw
-          tools:            tools_mingw1310_64
-          add-tools-to-path: true
-          cache:            true
+          version: ${{ env.QT_VERSION }}
+          host:    windows
+          target:  desktop
+          arch:    win64_msvc2022_64
+          cache:   true
 
       - name: Generate app.ico
         run: |
@@ -39,30 +37,27 @@ jobs:
 
       - name: Configure
         run: |
-          $mingw = "$env:IQTA_TOOLS\mingw1310_64\bin"
-          $env:PATH = "$mingw;$env:PATH"
-          cmake -S qt-client -B build -G Ninja `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR" `
-            -DCMAKE_C_COMPILER="$mingw\gcc.exe" `
-            -DCMAKE_CXX_COMPILER="$mingw\g++.exe"
+          cmake -S qt-client -B build `
+            -G "Visual Studio 17 2022" -A x64 `
+            -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
 
       - name: Build
-        run: cmake --build build --parallel
+        run: cmake --build build --config Release --parallel
 
       - name: Deploy Qt runtime
         run: |
           $deploy = "deploy"
           New-Item $deploy -ItemType Directory | Out-Null
-          Copy-Item build\${{ env.APP_NAME }}.exe $deploy\
-          Copy-Item build\libhex_solver.dll        $deploy\
+          # exe and custom DLL (POST_BUILD copies DLL next to exe)
+          Copy-Item "build\Release\${{ env.APP_NAME }}.exe" $deploy\
+          $dll = Get-ChildItem "build\Release" -Filter "*hex_solver*.dll" |
+                   Select-Object -First 1
+          if ($dll) { Copy-Item $dll.FullName $deploy\ }
           windeployqt6 --release --no-translations --dir $deploy `
-            build\${{ env.APP_NAME }}.exe
+            "$deploy\${{ env.APP_NAME }}.exe"
 
       - name: Package
-        run: |
-          $zip = "${{ env.APP_NAME }}-windows-x64.zip"
-          Compress-Archive deploy $zip
+        run: Compress-Archive deploy "${{ env.APP_NAME }}-windows-x64.zip"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -89,8 +84,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             libgl1-mesa-dev libglib2.0-dev \
-            libfuse2 patchelf \
-            python3-pil
+            libfuse2 patchelf
+          pip3 install Pillow
 
       - name: Generate icon PNG
         run: python3 qt-client/gen_icon.py 256 ${{ env.APP_NAME }}.png
@@ -106,8 +101,8 @@ jobs:
         run: |
           base="https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous"
           bqt="https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous"
-          wget -q -O linuxdeploy            "$base/linuxdeploy-x86_64.AppImage"
-          wget -q -O linuxdeploy-plugin-qt  "$bqt/linuxdeploy-plugin-qt-x86_64.AppImage"
+          wget -q -O linuxdeploy           "$base/linuxdeploy-x86_64.AppImage"
+          wget -q -O linuxdeploy-plugin-qt "$bqt/linuxdeploy-plugin-qt-x86_64.AppImage"
           chmod +x linuxdeploy linuxdeploy-plugin-qt
 
       - name: Create AppImage
@@ -152,8 +147,8 @@ jobs:
           sudo apt-get install -y \
             qt6-base-dev qt6-tools-dev cmake ninja-build \
             libgl1-mesa-dev libglib2.0-dev \
-            libfuse2 patchelf \
-            python3-pil
+            libfuse2 patchelf
+          pip3 install Pillow
 
       - name: Generate icon PNG
         run: python3 qt-client/gen_icon.py 256 ${{ env.APP_NAME }}.png
@@ -170,8 +165,8 @@ jobs:
         run: |
           base="https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous"
           bqt="https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous"
-          wget -q -O linuxdeploy            "$base/linuxdeploy-aarch64.AppImage"
-          wget -q -O linuxdeploy-plugin-qt  "$bqt/linuxdeploy-plugin-qt-aarch64.AppImage"
+          wget -q -O linuxdeploy           "$base/linuxdeploy-aarch64.AppImage"
+          wget -q -O linuxdeploy-plugin-qt "$bqt/linuxdeploy-plugin-qt-aarch64.AppImage"
           chmod +x linuxdeploy linuxdeploy-plugin-qt
 
       - name: Create AppImage
