@@ -220,28 +220,18 @@ jobs:
             "ndk;27.2.12479018" "build-tools;36.0.0" "platforms;android-36"
           echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> $GITHUB_ENV
 
-      - name: Install Qt 6.11.1 (Linux host tools)
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: '6.11.1'
-          host:    linux
-          target:  desktop
-          arch:    gcc_64
-          dir:     '${{ github.workspace }}/Qt'
-          cache:   true
-
-      - name: Save host Qt path
-        run: echo "QT_HOST_PATH=$QT_ROOT_DIR" >> $GITHUB_ENV
-
-      - name: Install Qt 6.11.1 (Android arm64-v8a)
+      - name: Install Qt 6.11.1 (Android arm64-v8a + host)
         uses: jurplel/install-qt-action@v4
         with:
           version: '6.11.1'
           host:    linux
           target:  android
           arch:    android_arm64_v8a
-          dir:     '${{ github.workspace }}/Qt'
+          extra:   '--autodesktop'
           cache:   true
+
+      - name: Set Qt host path
+        run: echo "QT_HOST_PATH=$(dirname $QT_ROOT_DIR)/gcc_64" >> $GITHUB_ENV
 
       - name: Prepare signing keystore
         run: |
