@@ -233,19 +233,11 @@ jobs:
       - name: Set Qt host path
         run: echo "QT_HOST_PATH=$(dirname $QT_ROOT_DIR)/gcc_64" >> $GITHUB_ENV
 
-      - name: Prepare signing keystore
+      - name: Decode signing keystore
         run: |
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | tr -d ' \n\r' | base64 -d > release.jks
-          cat > signing.properties << EOF
-          storeFile=${{ github.workspace }}/release.jks
-          storePassword=${{ secrets.ANDROID_KEYSTORE_PASS }}
-          keyAlias=${{ secrets.ANDROID_KEYSTORE_ALIAS }}
-          keyPassword=${{ secrets.ANDROID_KEYSTORE_PASS }}
-          EOF
-          echo "ANDROID_SIGNING_PROPERTIES=${{ github.workspace }}/signing.properties" \
-            >> $GITHUB_ENV
 
-      - name: Configure (Release)
+      - name: Configure (Release, unsigned)
         run: |
           cmake -S android-client -B build-android \
             -G Ninja \
@@ -263,13 +255,20 @@ jobs:
             -DQT_NO_GLOBAL_APK_TARGET_PART_OF_ALL=ON \
             -DQT_USE_TARGET_ANDROID_BUILD_DIR=ON
 
-      - name: Build signed APK
+      - name: Build unsigned APK
         run: cmake --build build-android --target apk --parallel
 
-      - name: Rename APK
+      - name: Sign APK with apksigner
         run: |
-          mv build-android/android-build-DailyHexPuzzleAndroid/build/outputs/apk/release/android-build-DailyHexPuzzleAndroid-release.apk \
-             ${{ env.APP_NAME }}-android-arm64.apk
+          UNSIGNED=$(find build-android -name "*.apk" -path "*/release/*" | head -1)
+          echo "Signing: $UNSIGNED"
+          $ANDROID_SDK_ROOT/build-tools/36.0.0/apksigner sign \
+            --ks release.jks \
+            --ks-key-alias "${{ secrets.ANDROID_KEYSTORE_ALIAS }}" \
+            --ks-pass "pass:${{ secrets.ANDROID_KEYSTORE_PASS }}" \
+            --key-pass "pass:${{ secrets.ANDROID_KEYSTORE_PASS }}" \
+            --out ${{ env.APP_NAME }}-android-arm64.apk \
+            "$UNSIGNED"
 
       - uses: actions/upload-artifact@v4
         with:
