@@ -235,7 +235,7 @@ jobs:
 
       - name: Prepare signing keystore
         run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > release.jks
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | tr -d ' \n\r' | base64 -d > release.jks
           cat > signing.properties << EOF
           storeFile=${{ github.workspace }}/release.jks
           storePassword=${{ secrets.ANDROID_KEYSTORE_PASS }}
