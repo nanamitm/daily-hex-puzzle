@@ -60,15 +60,10 @@ jobs:
       - name: Build
         run: cmake --build build --parallel
 
+      # Hashed file names: GitHub Pages serves everything with max-age=600,
+      # so without them a browser can mix a new index.html with a stale wasm
       - name: Collect site
-        run: |
-          mkdir dist
-          cp build/index.html               dist/
-          cp build/coi-serviceworker.js     dist/
-          cp build/qtloader.js              dist/
-          cp "build/${APP_NAME}.js"         dist/
-          cp "build/${APP_NAME}.wasm"       dist/
-          ls -lh dist
+        run: python3 qt-client/wasm/make-dist.py build dist
 
       - uses: actions/configure-pages@v6
 

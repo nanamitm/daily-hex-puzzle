@@ -62,7 +62,15 @@ python -m http.server 8080 --directory build-wasm   # then open /index.html
 ```
 
 `.github/workflows/pages.yml` builds and deploys this on every push to `main`
-that touches `qt-client/` or `solver-ffi/`.
+that touches `qt-client/` or `solver-ffi/`. The deployed copy is assembled by
+`qt-client/wasm/make-dist.py`, which puts the content hash in the file names
+(`DailyHexPuzzle.<hash>.js` / `.wasm`) — GitHub Pages serves everything with
+`Cache-Control: max-age=600`, so without that a browser could pair a fresh
+`index.html` with a ten-minute-old wasm:
+
+```bash
+python3 qt-client/wasm/make-dist.py build-wasm dist
+```
 
 ## Android app (Qt Quick / QML)
 
