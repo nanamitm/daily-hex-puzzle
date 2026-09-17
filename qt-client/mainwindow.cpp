@@ -220,7 +220,9 @@ void MainWindow::buildUi()
     m_alwaysTopAct->setCheckable(true);
     m_innerLinesAct->setCheckable(true);
     connect(gearBtn, &QPushButton::clicked, this, [this, gearBtn, gearMenu]() {
-        gearMenu->exec(gearBtn->mapToGlobal(gearBtn->rect().bottomLeft()));
+        // popup(), not exec(): exec() runs a nested event loop, which Qt for
+        // WebAssembly cannot do — it shuts the application down instead.
+        gearMenu->popup(gearBtn->mapToGlobal(gearBtn->rect().bottomLeft()));
     });
 
     vbox->addLayout(row1);

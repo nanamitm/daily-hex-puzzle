@@ -1,4 +1,5 @@
 #include <QApplication>
+#include <QScreen>
 #include "mainwindow.h"
 #include "appicon.h"
 
@@ -11,7 +12,14 @@ int main(int argc, char* argv[])
 
     MainWindow w;
 #ifdef Q_OS_WASM
-    w.showMaximized();   // fill the browser container instead of a tiny window
+    // Fill the browser container, and keep filling it: Qt for WebAssembly does
+    // not resize a maximized window when the browser window changes size.
+    if (QScreen* screen = app.primaryScreen()) {
+        w.setGeometry(screen->geometry());
+        QObject::connect(screen, &QScreen::geometryChanged,
+                         &w, [&w](const QRect& g) { w.setGeometry(g); });
+    }
+    w.show();
 #else
     w.show();
 #endif
