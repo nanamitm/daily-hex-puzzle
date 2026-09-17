@@ -1,7 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
 project(hex_solver_ffi C)
 
-add_library(hex_solver SHARED hex_solver.c)
+# Emscripten links everything into the app; a shared library is not usable there
+if(EMSCRIPTEN)
+    add_library(hex_solver STATIC hex_solver.c)
+else()
+    add_library(hex_solver SHARED hex_solver.c)
+endif()
 target_include_directories(hex_solver PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_compile_definitions(hex_solver PRIVATE _USE_MATH_DEFINES)
 

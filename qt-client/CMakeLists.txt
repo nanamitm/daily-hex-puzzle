@@ -54,6 +54,22 @@ if(MSVC)
     target_compile_definitions(DailyHexPuzzle PRIVATE _USE_MATH_DEFINES)
 endif()
 
+# ── WebAssembly: page shell + cross-origin isolation shim ─────────────────
+# The multithreaded Qt wasm build needs SharedArrayBuffer, so the page must be
+# cross-origin isolated. GitHub Pages cannot send COOP/COEP headers, hence the
+# service worker shim in wasm/ that adds them client side.
+if(EMSCRIPTEN)
+    set_target_properties(DailyHexPuzzle PROPERTIES
+        QT_WASM_INITIAL_MEMORY     "64MB"
+        QT_WASM_PTHREAD_POOL_SIZE  2      # main thread + SolverWorker
+    )
+
+    foreach(wasm_file index.html coi-serviceworker.js)
+        configure_file(${CMAKE_CURRENT_SOURCE_DIR}/wasm/${wasm_file}
+                       ${CMAKE_CURRENT_BINARY_DIR}/${wasm_file} COPYONLY)
+    endforeach()
+endif()
+
 # ── post-build: copy DLL next to the executable (Windows) ─────────────────
 if(WIN32)
     add_custom_command(TARGET DailyHexPuzzle POST_BUILD

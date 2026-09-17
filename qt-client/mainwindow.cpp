@@ -4,7 +4,7 @@
 #include <ctime>
 #include <QPainter>
 #include <QPainterPath>
-#include <QSettings>
+#include "appsettings.h"
 #include <QCalendarWidget>
 #include <QTextCharFormat>
 #include <QMenu>
@@ -122,7 +122,17 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 
 MainWindow::~MainWindow()
 {
-    QSettings s;
+    saveSettings();
+    if (m_worker) { m_worker->quit(); m_worker->wait(); }
+}
+
+// Saved on every change, not only on exit: a WebAssembly build is closed by
+// navigating away, which never runs the destructor.
+void MainWindow::saveSettings()
+{
+    if (!m_uiReady) return;   // buildUi() is still restoring the saved state
+
+    AppSettings s;
     bool slideshowOn = m_slideshowAct->isChecked();
     s.setValue("findAll",      slideshowOn ? m_savedFindAll : m_findAllChk->isChecked());
     s.setValue("autoMidnight", slideshowOn ? m_savedAutoMid : m_autoAct->isChecked());
@@ -131,8 +141,6 @@ MainWindow::~MainWindow()
     s.setValue("variant",      m_variantCombo->currentIndex());
     s.setValue("alwaysOnTop",  m_alwaysTopAct->isChecked());
     s.setValue("hideInnerLines", m_innerLinesAct->isChecked());
-
-    if (m_worker) { m_worker->quit(); m_worker->wait(); }
 }
 
 void MainWindow::buildUi()
@@ -190,6 +198,9 @@ void MainWindow::buildUi()
     m_autoAct      = gearMenu->addAction("Auto-update at midnight");
     m_slideshowAct = gearMenu->addAction("Slideshow (5 min)");
     m_alwaysTopAct  = gearMenu->addAction("Always on top");
+#ifdef Q_OS_WASM
+    m_alwaysTopAct->setVisible(false);   // no window manager in a browser tab
+#endif
     m_innerLinesAct = gearMenu->addAction("Hide inner lines");
     m_autoAct->setCheckable(true);
     m_slideshowAct->setCheckable(true);
@@ -248,10 +259,13 @@ void MainWindow::buildUi()
     connect(m_alwaysTopAct, &QAction::toggled, this, [this](bool on) {
         setWindowFlag(Qt::WindowStaysOnTopHint, on);
         show();
+        saveSettings();
     });
     connect(m_innerLinesAct, &QAction::toggled, this, [this](bool on) {
         m_board->setShowInnerLines(!on);
+        saveSettings();
     });
+    connect(m_autoAct, &QAction::toggled, this, [this](bool) { saveSettings(); });
 
     connect(m_slideshowAct, &QAction::toggled, this, [this](bool on) {
         if (on) {
@@ -275,6 +289,7 @@ void MainWindow::buildUi()
             m_findAllChk->setChecked(m_savedFindAll);
             m_autoAct->setChecked(m_savedAutoMid);
         }
+        saveSettings();
     });
 
     // ── Midnight timer ─────────────────────────────────────────────────────
@@ -306,13 +321,13 @@ void MainWindow::buildUi()
     });
     connect(m_variantCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, [this](int) { onVariantChanged(); });
-    connect(m_findAllChk, &QCheckBox::toggled, this, [this](bool) { scheduleSolve(); });
-    connect(m_flipChk,    &QCheckBox::toggled, this, [this](bool) { scheduleSolve(); });
+    connect(m_findAllChk, &QCheckBox::toggled, this, [this](bool) { saveSettings(); scheduleSolve(); });
+    connect(m_flipChk,    &QCheckBox::toggled, this, [this](bool) { saveSettings(); scheduleSolve(); });
     connect(m_prevBtn,    &QPushButton::clicked, this, &MainWindow::onPrev);
     connect(m_nextBtn,    &QPushButton::clicked, this, &MainWindow::onNext);
 
     // ── Restore settings ───────────────────────────────────────────────────
-    QSettings s;
+    AppSettings s;
     m_savedFindAll = s.value("findAll",      false).toBool();
     m_savedAutoMid = s.value("autoMidnight", false).toBool();
     m_findAllChk->setChecked(m_savedFindAll);
@@ -342,8 +357,11 @@ void MainWindow::buildUi()
     updateTodayMarker();
 
     adjustSize();
+#ifndef Q_OS_WASM
     setFixedSize(sizeHint());
+#endif
 
+    m_uiReady = true;
     scheduleSolve();
 }
 
@@ -383,6 +401,7 @@ void MainWindow::onVariantChanged()
     m_flipChk->blockSignals(false);
 
     updateBoardDate();
+    saveSettings();
     scheduleSolve();
 }
 

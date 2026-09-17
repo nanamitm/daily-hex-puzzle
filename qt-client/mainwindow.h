@@ -48,6 +48,7 @@ private slots:
 
 private:
     void buildUi();
+    void saveSettings();
     void scheduleSolve();
     void scheduleMidnight();
     void showSolution(int idx);
@@ -83,6 +84,7 @@ private:
     SolveOverlay*        m_overlay      = nullptr;
     QVector<HexBoard>    m_solutions;
     int                  m_idx          = 0;
+    bool                 m_uiReady      = false;
     bool                 m_solving      = false;
     bool                 m_pendingSolve = false;
     LcgCycle             m_lcgCycle;

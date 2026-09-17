@@ -10,6 +10,10 @@ int main(int argc, char* argv[])
     app.setWindowIcon(makeHexIcon());
 
     MainWindow w;
+#ifdef Q_OS_WASM
+    w.showMaximized();   // fill the browser container instead of a tiny window
+#else
     w.show();
+#endif
     return app.exec();
 }

@@ -35,6 +35,35 @@ cmake -S qt-client -B build -DCMAKE_PREFIX_PATH=/path/to/Qt/6.x.x
 cmake --build build --config Release
 ```
 
+## Web app (Qt for WebAssembly)
+
+The same Qt desktop client, compiled to WebAssembly and published on GitHub Pages:
+**https://nanamitm.github.io/daily-hex-puzzle/**
+
+Same features as the desktop app; settings are stored in the browser's
+`localStorage`. The first load downloads about 6 MB (gzipped) and the page
+reloads itself once while the cross-origin isolation service worker takes over.
+
+**Why the service worker:** the solver runs on a `QThread`, so the
+multithreaded Qt wasm build is required, which needs `SharedArrayBuffer` and
+therefore a cross-origin isolated page. GitHub Pages cannot send the
+COOP/COEP headers, so `qt-client/wasm/coi-serviceworker.js` adds them client
+side. Needs Safari 16.4+ / a current Chrome or Firefox.
+
+**Requirements to build**
+- Qt 6.11.1 for WebAssembly (`wasm_multithread`) + matching host Qt
+- Emscripten 4.0.7 (the version this Qt was built with — other versions are rejected)
+
+```bash
+source /path/to/emsdk/emsdk_env.sh
+/path/to/Qt/6.11.1/wasm_multithread/bin/qt-cmake -S qt-client -B build-wasm   -DCMAKE_BUILD_TYPE=Release   -DQT_HOST_PATH=/path/to/Qt/6.11.1/gcc_64
+cmake --build build-wasm
+python -m http.server 8080 --directory build-wasm   # then open /index.html
+```
+
+`.github/workflows/pages.yml` builds and deploys this on every push to `main`
+that touches `qt-client/` or `solver-ffi/`.
+
 ## Android app (Qt Quick / QML)
 
 A Qt Quick port for Android (arm64-v8a).

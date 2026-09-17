@@ -28,6 +28,14 @@
 #include <string.h>
 #include <time.h>
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+/* clock() counts CPU time per thread under Emscripten and is too coarse here */
+#define HEX_NOW_MS() emscripten_get_now()
+#else
+#define HEX_NOW_MS() ((double)clock() * 1000.0 / CLOCKS_PER_SEC)
+#endif
+
 /* ── cancellation flag (written by hex_cancel, read by DFS) ─────────────── */
 static volatile int g_cancel = 0;
 
@@ -465,7 +473,7 @@ HexSolveResult hex_solve(int month, int day, int weekday,
         setMark(&f0, map, DTEXT[weekday], MARK_DATE);
 
     /* run DFS */
-    clock_t t0 = clock();
+    double t0 = HEX_NOW_MS();
 
     Sdata sd;
     memset(&sd, 0, sizeof(sd));
@@ -474,7 +482,7 @@ HexSolveResult hex_solve(int month, int day, int weekday,
     SolBuf sb = {NULL, 0, 0, find_all ? 1 : 0};
     placeCheck(&sd, 0, pn_count, local_pieces, poseNum, &sb);
 
-    double ms = (double)(clock() - t0) * 1000.0 / CLOCKS_PER_SEC;
+    double ms = HEX_NOW_MS() - t0;
 
     /* recode MARK_NON→0xFF and MARK_DATE→0xFE in every stored board */
     encodeSolutions(sb.buf, sb.count);
