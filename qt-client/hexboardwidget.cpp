@@ -80,8 +80,22 @@ HexBoardWidget::HexBoardWidget(QWidget* parent) : QWidget(parent)
     // bottommost hex bottom edge: cy(r=8) + RADIUS
     const double bottom = h * 9.0    + PAD_inner + RADIUS;
 
-    setFixedSize(static_cast<int>(right  + PAD_outer),
-                 static_cast<int>(bottom + PAD_outer));
+    m_natW = static_cast<int>(right  + PAD_outer);
+    m_natH = static_cast<int>(bottom + PAD_outer);
+
+#ifdef Q_OS_WASM
+    // A browser window can be narrower than the board's natural size, so the
+    // drawing is scaled to fit in paintEvent() instead of fixing the size.
+    setMinimumSize(m_natW / 4, m_natH / 4);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+#else
+    setFixedSize(m_natW, m_natH);
+#endif
+}
+
+QSize HexBoardWidget::sizeHint() const
+{
+    return {m_natW, m_natH};
 }
 
 void HexBoardWidget::setVariant(int variant)
@@ -233,6 +247,13 @@ void HexBoardWidget::paintEvent(QPaintEvent*)
     p.setRenderHint(QPainter::Antialiasing);
     QFont fnt("Segoe UI", 8, QFont::Bold);
     p.setFont(fnt);
+
+    // Scale the whole board into the widget, keeping it centred and square.
+    // On desktop the widget has its natural size, so this is a no-op.
+    const double scale = qMin(double(width()) / m_natW, double(height()) / m_natH);
+    p.translate((width()  - m_natW * scale) / 2.0,
+                (height() - m_natH * scale) / 2.0);
+    p.scale(scale, scale);
 
     // ── Pass 1: empty cells and date markers ──────────────────────────────
     for (int r = 0; r < HEX_GRID; ++r) {

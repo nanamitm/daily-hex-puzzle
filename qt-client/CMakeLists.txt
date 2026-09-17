@@ -29,6 +29,8 @@ endif()
 # ── Qt client executable ───────────────────────────────────────────────────
 qt_add_executable(DailyHexPuzzle WIN32 MACOSX_BUNDLE
     main.cpp
+    appsettings.h
+    flowlayout.h
     mainwindow.h
     mainwindow.cpp
     hexboardwidget.h

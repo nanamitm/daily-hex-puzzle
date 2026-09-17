@@ -17,6 +17,8 @@ public:
     void clearBoard();
     void setShowInnerLines(bool show);
 
+    QSize sizeHint() const override;
+
 protected:
     void paintEvent(QPaintEvent*) override;
 
@@ -31,6 +33,8 @@ private:
     static const char* MAP43V2[HEX_GRID][HEX_GRID];
     static const char* MAP61  [HEX_GRID][HEX_GRID];
 
+    int    m_natW           = 0;   // board size at scale 1
+    int    m_natH           = 0;
     int    m_variant        = 0;
     QDate  m_date;
     int    m_weekday        = 0;

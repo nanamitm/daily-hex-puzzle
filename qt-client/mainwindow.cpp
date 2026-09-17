@@ -5,6 +5,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include "appsettings.h"
+#include "flowlayout.h"
 #include <QCalendarWidget>
 #include <QTextCharFormat>
 #include <QMenu>
@@ -152,47 +153,59 @@ void MainWindow::buildUi()
     vbox->setContentsMargins(12, 12, 12, 12);
 
     // ── Row 1: date navigation ─────────────────────────────────────────────
+    // On wasm the browser window can be narrower than the whole control row,
+    // so it wraps there; on desktop it stays a plain single row.
+#ifdef Q_OS_WASM
+    auto* row1 = new FlowLayout(nullptr, 0, 6);
+    auto addW       = [row1](QWidget* w) { row1->addWidget(w); };
+    auto addSpace   = [](int) {};
+    auto addStretch = []() {};
+#else
     auto* row1 = new QHBoxLayout;
+    auto addW       = [row1](QWidget* w) { row1->addWidget(w); };
+    auto addSpace   = [row1](int n) { row1->addSpacing(n); };
+    auto addStretch = [row1]() { row1->addStretch(); };
+#endif
 
     auto* prevDay = new QPushButton("◀", this);
     prevDay->setFixedWidth(28);
-    row1->addWidget(prevDay);
+    addW(prevDay);
 
     m_dateEdit = new QDateEdit(QDate::currentDate(), this);
     m_dateEdit->setCalendarPopup(true);
     QString dateFmt = QLocale::system().dateFormat(QLocale::ShortFormat);
     if (!dateFmt.contains("yyyy")) dateFmt.replace("yy", "yyyy");
     m_dateEdit->setDisplayFormat(dateFmt);
-    row1->addWidget(m_dateEdit);
+    addW(m_dateEdit);
 
     auto* nextDay = new QPushButton("▶", this);
     nextDay->setFixedWidth(28);
-    row1->addWidget(nextDay);
+    addW(nextDay);
 
     m_todayBtn = new QPushButton("Today", this);
     m_todayBtn->setFixedWidth(54);
-    row1->addWidget(m_todayBtn);
+    addW(m_todayBtn);
 
-    row1->addSpacing(8);
+    addSpace(8);
 
     // Variant selector
     m_variantCombo = new QComboBox(this);
     m_variantCombo->addItems({"43-cell v1", "43-cell v2", "61-cell"});
-    row1->addWidget(m_variantCombo);
+    addW(m_variantCombo);
 
-    row1->addSpacing(4);
+    addSpace(4);
     m_findAllChk = new QCheckBox("Find all", this);
-    row1->addWidget(m_findAllChk);
+    addW(m_findAllChk);
 
     m_flipChk = new QCheckBox("Allow flip", this);
-    row1->addWidget(m_flipChk);
+    addW(m_flipChk);
 
     // Gear menu
     auto* gearBtn = new QPushButton("⚙", this);
     gearBtn->setFixedWidth(28);
     gearBtn->setToolTip("Settings");
-    row1->addWidget(gearBtn);
-    row1->addStretch();
+    addW(gearBtn);
+    addStretch();
 
     auto* gearMenu = new QMenu(this);
     m_autoAct      = gearMenu->addAction("Auto-update at midnight");
@@ -214,7 +227,11 @@ void MainWindow::buildUi()
 
     // ── Board ──────────────────────────────────────────────────────────────
     m_board = new HexBoardWidget(this);
+#ifdef Q_OS_WASM
+    vbox->addWidget(m_board, 1);          // scales itself to the space it gets
+#else
     vbox->addWidget(m_board, 0, Qt::AlignHCenter);
+#endif
 
     // ── Navigation row ─────────────────────────────────────────────────────
     auto* navRow = new QHBoxLayout;
