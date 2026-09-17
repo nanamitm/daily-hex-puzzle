@@ -45,8 +45,8 @@ jobs:
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
-          host:    linux
-          target:  desktop
+          host:    all_os
+          target:  wasm
           arch:    wasm_multithread
           extra:   --autodesktop
           cache:   true
