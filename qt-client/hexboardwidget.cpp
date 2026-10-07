@@ -299,8 +299,10 @@ void HexBoardWidget::paintEvent(QPaintEvent*)
         // Borders at piece perimeters
         p.setRenderHint(QPainter::Antialiasing, false);
         p.setPen(QPen(BORDER, 1.5));
-        const int dr[] = {-1, 0, 1, 1, 0,-1};
-        const int dc[] = { 0, 1, 1, 0,-1,-1};
+        // hexPoly() starts at the bottom vertex and goes counterclockwise.
+        // Match each edge to its outward neighbor (as in HexBoardCanvas).
+        const int dr[] = { 1, 0,-1,-1, 0, 1};
+        const int dc[] = { 1, 1, 0,-1,-1, 0};
         for (int r = 0; r < HEX_GRID; ++r) {
             for (int c = 0; c < HEX_GRID; ++c) {
                 int g = cellGroup(r, c);
