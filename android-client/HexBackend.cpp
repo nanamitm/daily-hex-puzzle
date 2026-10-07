@@ -102,6 +102,14 @@ HexBackend::HexBackend(QObject* parent) : QObject(parent)
     updateBoardData(nullptr, m_displayDate);
 }
 
+HexBackend::~HexBackend()
+{
+    if (m_worker) {
+        m_worker->requestCancel();
+        m_worker->wait();
+    }
+}
+
 // ── Property setters ───────────────────────────────────────────────────────
 
 void HexBackend::setVariant(int v)

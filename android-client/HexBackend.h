@@ -24,6 +24,7 @@ class HexBackend : public QObject {
 
 public:
     explicit HexBackend(QObject* parent = nullptr);
+    ~HexBackend() override;
 
     bool         solving()       const { return m_solving; }
     int          solutionCount() const { return (int)m_solutions.size(); }
