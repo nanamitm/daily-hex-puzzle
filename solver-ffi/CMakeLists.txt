@@ -21,3 +21,11 @@ endif()
 set_target_properties(hex_solver PROPERTIES
     WINDOWS_EXPORT_ALL_SYMBOLS ON
 )
+
+option(HEX_SOLVER_BUILD_TESTS "Build solver regression tests" OFF)
+if(HEX_SOLVER_BUILD_TESTS)
+    enable_testing()
+    add_executable(hex_solver_tests tests/cancellation.c)
+    target_link_libraries(hex_solver_tests PRIVATE hex_solver)
+    add_test(NAME solver_cancellation COMMAND hex_solver_tests)
+endif()

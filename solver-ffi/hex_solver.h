@@ -35,7 +35,18 @@ typedef struct {
 HexSolveResult hex_solve(int month, int day, int weekday,
                          int variant, bool allow_flip, bool find_all);
 
-/* Call from any thread to stop an in-progress solve early */
+/* Initialize to {0} before starting the worker. Keep alive until it finishes.
+ * Use a separate token for each search; do not reset it while in use. */
+typedef struct {
+    long requested;
+} HexCancelToken;
+
+HexSolveResult hex_solve_cancellable(int month, int day, int weekday,
+                                     int variant, bool allow_flip, bool find_all,
+                                     HexCancelToken* cancel);
+void hex_request_cancel(HexCancelToken* cancel);
+
+/* Stops the legacy hex_solve search. For worker threads use a per-search token. */
 void hex_cancel(void);
 
 void hex_free_result(HexSolveResult r);

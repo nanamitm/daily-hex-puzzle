@@ -1,7 +1,6 @@
 #pragma once
 #include <QThread>
 #include <QDate>
-#include <atomic>
 #include <vector>
 #include "../solver-ffi/hex_solver.h"
 
@@ -25,8 +24,7 @@ public:
     HexSolverOutput result;
 
     void requestCancel() {
-        hex_cancel();
-        m_cancelled.store(true, std::memory_order_relaxed);
+        hex_request_cancel(&m_cancel);
     }
 
 signals:
@@ -36,5 +34,5 @@ protected:
     void run() override;
 
 private:
-    std::atomic<bool> m_cancelled{false};
+    HexCancelToken m_cancel{0};
 };

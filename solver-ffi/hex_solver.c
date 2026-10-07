@@ -28,6 +28,10 @@
 #include <string.h>
 #include <time.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 /* clock() counts CPU time per thread under Emscripten and is too coarse here */
@@ -37,9 +41,30 @@
 #endif
 
 /* ── cancellation flag (written by hex_cancel, read by DFS) ─────────────── */
-static volatile int g_cancel = 0;
+static HexCancelToken g_cancel = {0};
 
-void hex_cancel(void) { g_cancel = 1; }
+static long cancel_requested(HexCancelToken* cancel)
+{
+    if (!cancel) return 0;
+#ifdef _WIN32
+    return InterlockedCompareExchange(&cancel->requested, 0, 0);
+#else
+    return __atomic_load_n(&cancel->requested, __ATOMIC_RELAXED);
+#endif
+}
+
+static void set_cancel(HexCancelToken* cancel, long value)
+{
+    if (!cancel) return;
+#ifdef _WIN32
+    InterlockedExchange(&cancel->requested, value);
+#else
+    __atomic_store_n(&cancel->requested, value, __ATOMIC_RELAXED);
+#endif
+}
+
+void hex_request_cancel(HexCancelToken* cancel) { set_cancel(cancel, 1); }
+void hex_cancel(void) { hex_request_cancel(&g_cancel); }
 
 void hex_free_result(HexSolveResult r)
 {
@@ -242,9 +267,9 @@ static void solbuf_push(SolBuf *sb, const Field *f)
 
 static int placeCheck(Sdata *sd, int pn, int pn_count,
                       Field piece[][POSE], const int poseNum[],
-                      SolBuf *sb)
+                      SolBuf *sb, HexCancelToken* cancel)
 {
-    if (g_cancel) return 0;
+    if (cancel_requested(cancel)) return 0;
 
     if (pn == pn_count) {
         solbuf_push(sb, &sd->f);
@@ -274,7 +299,7 @@ static int placeCheck(Sdata *sd, int pn, int pn_count,
                     Sdata nsd = *sd;
                     nsd.used[i] = 1;
                     doPlace(&nsd.f, &piece[i][pose], posx, posy);
-                    result += placeCheck(&nsd, pn+1, pn_count, piece, poseNum, sb);
+                    result += placeCheck(&nsd, pn+1, pn_count, piece, poseNum, sb, cancel);
                     if (!sb->find_all && result) return 1;
                 }
             }
@@ -414,7 +439,15 @@ static const char *DTEXT[7] = {
 HexSolveResult hex_solve(int month, int day, int weekday,
                          int variant, bool allow_flip, bool find_all)
 {
-    g_cancel = 0;
+    set_cancel(&g_cancel, 0);
+    return hex_solve_cancellable(month, day, weekday, variant, allow_flip,
+                                 find_all, &g_cancel);
+}
+
+HexSolveResult hex_solve_cancellable(int month, int day, int weekday,
+                                     int variant, bool allow_flip, bool find_all,
+                                     HexCancelToken* cancel)
+{
 
     /* pick variant data */
     int         pn_count;
@@ -480,7 +513,7 @@ HexSolveResult hex_solve(int month, int day, int weekday,
     sd.f = f0;
 
     SolBuf sb = {NULL, 0, 0, find_all ? 1 : 0};
-    placeCheck(&sd, 0, pn_count, local_pieces, poseNum, &sb);
+    placeCheck(&sd, 0, pn_count, local_pieces, poseNum, &sb, cancel);
 
     double ms = HEX_NOW_MS() - t0;
 
@@ -491,6 +524,6 @@ HexSolveResult hex_solve(int month, int day, int weekday,
     r.solutions  = sb.buf;
     r.count      = sb.count;
     r.elapsed_ms = ms;
-    r.cancelled  = (bool)g_cancel;
+    r.cancelled  = (bool)cancel_requested(cancel);
     return r;
 }
