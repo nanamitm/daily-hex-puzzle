@@ -168,6 +168,7 @@ ApplicationWindow {
 
     Component.onCompleted: {
         root.userFindAll  = appSettings.userFindAll
+        backend.findAll  = root.userFindAll
         root.autoMidnight = appSettings.autoMidnight
 
         // Restore variant and flip (blockSignals-style via backend)
