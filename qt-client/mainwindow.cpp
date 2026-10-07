@@ -124,7 +124,10 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 MainWindow::~MainWindow()
 {
     saveSettings();
-    if (m_worker) { m_worker->quit(); m_worker->wait(); }
+    if (m_worker) {
+        m_worker->requestCancel();
+        m_worker->wait();
+    }
 }
 
 // Saved on every change, not only on exit: a WebAssembly build is closed by
