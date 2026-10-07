@@ -35,10 +35,11 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass `
             -File qt-client/gen_icon.ps1 -OutDir qt-client
 
+      # No -G: windows-latest moves to newer Visual Studio releases, and CMake
+      # picks whichever one the runner image has installed
       - name: Configure
         run: |
-          cmake -S qt-client -B build `
-            -G "Visual Studio 17 2022" -A x64 `
+          cmake -S qt-client -B build -A x64 `
             -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
 
       - name: Build
