@@ -4,6 +4,9 @@ project(hex_solver_ffi C)
 # Emscripten links everything into the app; a shared library is not usable there
 if(EMSCRIPTEN)
     add_library(hex_solver STATIC hex_solver.c)
+    # The solver runs on a worker thread of the multithreaded Qt wasm build, and
+    # its atomic cancel flag needs the 'atomics' feature to link with shared memory
+    target_compile_options(hex_solver PRIVATE -pthread)
 else()
     add_library(hex_solver SHARED hex_solver.c)
 endif()
